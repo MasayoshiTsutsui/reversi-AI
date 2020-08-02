@@ -104,18 +104,12 @@ let rec slice list index = (*リストから指定されたインデックスの
 let copy_board board = (*ボードは二重配列のため、ただのcopyだとうまくいかない*)
   Array.map Array.copy board
 
-let play board color =
-  let ms = valid_moves board color in
-    if ms = [] then
-      Pass
-    else
-      let ocolor = opposite_color color in
-      let next_boards = List.map (fun (i,j) -> doMove (copy_board board) (Mv (i,j)) color) ms in (*自分が一手打った後の盤面のリスト*)
-      let o_valid_moves_num = List.map (fun b -> count_valid_moves b ocolor) next_boards in (*一手先の盤面での相手の有向手数のリスト*)
-      let index = index_of_min(o_valid_moves_num) in (*o_valid_moves_numのリストの要素の中で最小のもののインデックス*)
-      let (i,j) = List.nth ms index in
-      let unlikable_move_for_o = Mv (i,j) in (*相手の有向手数が最も少なくなるような一手*)
-      unlikable_move_for_o
+let list_next_boards board color ms = (*盤面と色と有向手のリストを渡すと、1つ先の盤面のリストを返す*)
+  List.map (fun (i,j) -> doMove (copy_board board) (Mv (i,j)) color) ms
+
+let list_next_move_and_boards board color ms = (*1つ先の盤面と、それに至った一手をペアにして返す. init_surely_winにて使用*)
+  List.map (fun (i,j) -> ((i,j), doMove (copy_board board) (Mv (i,j)) color)) ms
+
 
 let count board color =
   let s = ref 0 in
@@ -126,6 +120,83 @@ let count board color =
     done;
     !s
 
+let is_gameset board =
+  let s = ref true in
+  for i=1 to 8 do
+    for j=1 to 8 do
+      if board.(i).(j) = none then s := false
+    done
+  done;
+  !s
+
+let is_true boolean = boolean = true
+
+(*盤面と打ち手の色を渡すと、必勝ルートがあるかをbool値で返す*)
+let rec surely_win board color =
+  match is_gameset board with
+  |true -> if count board color > 32 then true else false
+  |false -> let ms = valid_moves board color in
+            let next_boards = list_next_boards board color ms in
+            let ocolor = opposite_color color in
+            List.exists is_true (List.map (fun b -> surely_lose b ocolor) next_boards) 
+and surely_lose board color =
+  match is_gameset board with
+  |true -> if count board color < 32 then true else false
+  |false -> let ms = valid_moves board color in
+            let next_boards = list_next_boards board color ms in
+            let ocolor = opposite_color color in
+            List.for_all is_true (List.map (fun b -> surely_win b ocolor) next_boards)
+
+type victory_road = Win of (int * int) | Undecidable
+exception Ms_Nextboards_mismatch
+(*必勝手がある場合、その必勝手につながる最初の一手も一緒に返してほしいので、surely_winをplay関数でいきなり呼ぶのではなく、init_surely_winを呼んで、この関数が内部でsurely_loseを呼ぶ*)
+let init_surely_win board color =
+  let ms = valid_moves board color in
+  let ocolor = opposite_color color in
+  let next_boards = list_next_boards board color ms in
+  let rec init_surely_iter mvlist nboards = (*msとnext_boardsを渡すと、next_boardsを一つ一つsurely_loseに渡し、必勝手がある場合は、その手をmsから返す関数(msとnext_boardsのインデックスが対応しているから単純なパターンマッチで行ける)*)
+    match (mvlist, nboards) with
+    | ([], []) -> Undecidable
+    | (m::mrest, nb::nbrest) -> if surely_lose nb ocolor then Win m else init_surely_iter mrest nbrest
+    | _ -> raise Ms_Nextboards_mismatch
+  in
+  init_surely_iter ms next_boards
+
+let count_stones board =
+  let s = ref 0 in
+  for i=1 to 8 do
+    for j=1 to 8 do
+      if board.(i).(j) != none then s := !s + 1
+    done
+  done;
+  !s
+
+
+let unlikable_for_o next_boards ocolor ms =
+  let o_valid_moves_num = List.map (fun b -> count_valid_moves b ocolor) next_boards in (*一手先の盤面での相手の有向手数のリスト*)
+  let index = index_of_min o_valid_moves_num in (*o_valid_moves_numのリストの要素の中で最小のもののインデックス*)
+  let (i,j) = List.nth ms index in
+  let unlikable_move_for_o = Mv (i,j) in (*相手の有向手数が最も少なくなるような一手*)
+  unlikable_move_for_o
+
+
+
+let play board color =
+  let ms = valid_moves board color in
+  let ocolor = opposite_color color in
+  let next_boards =  list_next_boards board color ms in (*自分が一手打った後の盤面のリスト*)
+    if ms = [] then
+      Pass
+    else if count_stones board > 53 then
+      match init_surely_win board color with
+      |Win (i,j) -> Mv (i,j)
+      |Undecidable -> unlikable_for_o next_boards ocolor ms
+    else
+      let o_valid_moves_num = List.map (fun b -> count_valid_moves b ocolor) next_boards in (*一手先の盤面での相手の有向手数のリスト*)
+      let index = index_of_min o_valid_moves_num in (*o_valid_moves_numのリストの要素の中で最小のもののインデックス*)
+      let (i,j) = List.nth ms index in
+      let unlikable_move_for_o = Mv (i,j) in (*相手の有向手数が最も少なくなるような一手*)
+      unlikable_move_for_o
 
 let print_board board =
   print_endline " |A B C D E F G H ";
