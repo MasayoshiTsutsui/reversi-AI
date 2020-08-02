@@ -171,6 +171,28 @@ let count_stones board =
   done;
   !s
 
+let min_of_list l =
+  let rec min_iter l min =
+    match l with
+    | [] -> min
+    | i :: rest -> if i < min then min_iter rest i else min_iter rest min
+  in min_iter l 64
+
+let idx_of_max l = (*数値リストの最大値のインデックスを返す*)
+  let rec idx_iter l cur_idx max max_idx =
+    match l with
+    | [] -> max_idx
+    | i :: rest -> if i > max then idx_iter rest (cur_idx+1) i cur_idx else idx_iter rest (cur_idx+1) max max_idx 
+  in idx_iter l 0 0 0
+
+let increase_my_valids next_boards color ms = (*2手先の盤面における自分の有効手数を評価関数に据え、minmax法で評価した際の最善手を返す*)
+  let ocolor = opposite_color color in
+  let boards_2turns_ahead = List.map (fun b -> list_next_boards b ocolor (valid_moves b ocolor)) next_boards in (*2手先の盤面のリスト。盤面配列の2重リストになっていることに注意*)
+  let valuation_of_nextboards = List.map (fun blist -> min_of_list (List.map (fun b -> count_valid_moves b color) blist)) boards_2turns_ahead in (*2手先の盤面(自分の手番)における有向手数のリストを最内のList.mapで求め、敵がその中で、自分の有向手数がもっとも少ない手を打つと想定。よって1手先の盤面の評価値は、その盤面の更に1手先における自分の有向手数の最小値となる*)
+  let best_mv_idx = idx_of_max valuation_of_nextboards in (*valuation_of_nextboardsのなかで評価値の最も高い値のインデックス*)
+  let best_move = List.nth ms best_mv_idx in (*msのインデックスと、next_boardsのインデックスが対応しているため、このようにできる*)
+  best_move
+
 
 let unlikable_for_o next_boards ocolor ms =
   let o_valid_moves_num = List.map (fun b -> count_valid_moves b ocolor) next_boards in (*一手先の盤面での相手の有向手数のリスト*)
@@ -180,23 +202,26 @@ let unlikable_for_o next_boards ocolor ms =
   unlikable_move_for_o
 
 
+let rec corner_checker ms =
+  match ms with
+  |[] -> (0,0)
+  |(i,j) :: mrest -> if (i,j) = (1,8) || (i,j) = (8,1) || (i,j) = (1,1) || (i,j) = (8,8) then (i,j) else corner_checker mrest
+
 
 let play board color =
   let ms = valid_moves board color in
-  let ocolor = opposite_color color in
   let next_boards =  list_next_boards board color ms in (*自分が一手打った後の盤面のリスト*)
+  let (ic,jc) = corner_checker ms in
     if ms = [] then
       Pass
     else if count_stones board > 53 then
       match init_surely_win board color with
       |Win (i,j) -> Mv (i,j)
-      |Undecidable -> unlikable_for_o next_boards ocolor ms
+      |Undecidable ->  let (i,j) = increase_my_valids next_boards color ms in Mv (i,j)
+    else if (ic,jc) <> (0,0) then Mv (ic,jc)
     else
-      let o_valid_moves_num = List.map (fun b -> count_valid_moves b ocolor) next_boards in (*一手先の盤面での相手の有向手数のリスト*)
-      let index = index_of_min o_valid_moves_num in (*o_valid_moves_numのリストの要素の中で最小のもののインデックス*)
-      let (i,j) = List.nth ms index in
-      let unlikable_move_for_o = Mv (i,j) in (*相手の有向手数が最も少なくなるような一手*)
-      unlikable_move_for_o
+    let (i,j) = increase_my_valids next_boards color ms in
+    Mv (i,j)
 
 let print_board board =
   print_endline " |A B C D E F G H ";
