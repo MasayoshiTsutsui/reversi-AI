@@ -17,7 +17,7 @@ ifndef SUBPROJS
   export SUBPROJS = client server
 endif
 
-all: byte-code
+all: native-code
 
 %:
 	@$(MAKE) -f $(OCAMLMAKEFILE) subprojs SUBTARGET=$@

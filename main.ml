@@ -6,10 +6,10 @@ open Color
 open Printf
 
 let opt_verbose     = ref false
-let opt_player_name = ref "Tsutsui."
+let opt_player_name = ref "4ahead+."
 let opt_port        = ref 3000
-let opt_host        = ref "localhost"
-
+(*let opt_host        = ref "localhost"*)
+let opt_host        = ref "192.168.1.27"
 let options =
   [("-H", Arg.Set_string opt_host, "host name (default = local host)");
    ("-p", Arg.Set_int    opt_port, "port number (default = 3000)");
@@ -27,6 +27,7 @@ let input_color ic =
 let output_color oc color =
   if color = white then (output_string oc "white\n"; flush oc)
   else                  (output_string oc "black\n"; flush oc)
+
 
 let input_command ic =
   let s = input_line ic in
@@ -51,17 +52,6 @@ let output_command oc command =
     | _ ->
       failwith "Client cannot not send the commands other than MOVE and Open"
 
-
-type opmove = PMove of move | OMove of move
-
-let string_of_opmove = function
-  | PMove mv -> "+" ^ string_of_move mv
-  | OMove mv -> "-" ^ string_of_move mv
-
-type hist = opmove list
-
-let string_of_hist x = List.fold_left (fun r a -> string_of_opmove a ^ " " ^ r) "" x
-let print_hist x = print_endline (string_of_hist x)
 
 let string_of_scores scores =
   let maxlen =
@@ -90,7 +80,7 @@ let rec wait_start (ic,oc) =
       failwith "Invalid Command"
 
 and my_move (ic,oc) board color hist oname mytime =
-  let pmove = play board color in
+  let pmove = play board color hist in
   let board = doMove board pmove color in
   let _ = output_command oc (Move pmove) in
   let _ = if !opt_verbose then
