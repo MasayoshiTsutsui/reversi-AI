@@ -1,19 +1,18 @@
 # Reversi Server & Client
 
-## how to build
+## How to Build
 ```
 $ make
-    
 ```
 
 It generates two execution files: `reversi` and `reversi-serv` that are the client and the server, respectively.
 
 
-## how to use 
+## How to Use 
 
 run server：
 ```
-    $ reversi-serv -p 30000 -t 500
+$ reversi-serv -p 30000 -t 500
 ```
 
 Use `-p` option for port specification.
@@ -44,7 +43,5 @@ As doing above, the game starts.
 NOTE: Player name must be different.
 
 `--help` option will tell you the detail of each option.
-
-なお,`--help`オプションをつければ、各オプションの簡単な説明が読める.
 
 Refer to `reversi-protocol.pdf` for the detailed protocol.
