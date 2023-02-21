@@ -1,4 +1,6 @@
 # Reversi Server & Client
+![image](https://user-images.githubusercontent.com/62000880/220342236-c04496a9-ef1e-4c80-a63c-9a895ff9e1f3.png)
+
 
 ## How to Build
 ```
